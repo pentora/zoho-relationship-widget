@@ -255,7 +255,7 @@ function fetchGraph(entityId) {
   });
 }
 function fetchAccountsBatch(ids) {
-  var BATCH = 100;
+  var BATCH = 50;
   var chunks = [];
   for (var i = 0; i < ids.length; i += BATCH) {
     chunks.push(ids.slice(i, i + BATCH));
@@ -364,16 +364,22 @@ function applyFilters() {
 
 // ── Simulation ──
 function simulate() {
-  var rep = 3500, sk = 0.007, grav = 0.012, damp = 0.82;
-  var sl = Math.min(gW, gH) * 0.22;
+  var nodeCount = gNodes.length;
+  var rep = 5000 + nodeCount * 200;
+  var sk = 0.005, grav = 0.01, damp = 0.8;
+  var sl = Math.min(gW, gH) * (nodeCount > 15 ? 0.18 : 0.24);
+  var minDist = 80;
   var cx = gW / 2, cy = gH / 2;
-  for (var i = 0; i < gNodes.length; i++) {
+  for (var i = 0; i < nodeCount; i++) {
     var fx = 0, fy = 0, ni = gNodes[i];
-    for (var j = 0; j < gNodes.length; j++) {
+    for (var j = 0; j < nodeCount; j++) {
       if (i === j) continue;
       var dx = ni.x - gNodes[j].x, dy = ni.y - gNodes[j].y;
       var d = Math.sqrt(dx * dx + dy * dy) || 1;
-      fx += (dx / d) * (rep / (d * d)); fy += (dy / d) * (rep / (d * d));
+      // stronger repulsion + hard minimum distance
+      var f = rep / (d * d);
+      if (d < minDist) f += (minDist - d) * 2;
+      fx += (dx / d) * f; fy += (dy / d) * f;
     }
     for (var k = 0; k < gEdges.length; k++) {
       var e = gEdges[k], oi = -1;

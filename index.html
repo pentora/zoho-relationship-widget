@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>関係性ネットワーク</title>
+<style>
+:root {
+  --ground: #F3F4F6;
+  --surface: #FFFFFF;
+  --text: #1E2A3A;
+  --text-muted: #64748B;
+  --accent: #2563EB;
+  --border: #E2E5EA;
+  --mono: "Cascadia Code", "Consolas", "SF Mono", monospace;
+  --display: "Segoe UI Variable Display", "Yu Gothic UI", "Meiryo", sans-serif;
+  --body: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
+  --st-existing: #059669;
+  --st-deal: #2563EB;
+  --st-contact: #D97706;
+  --st-new: #94A3B8;
+  --st-dormant: #CBD5E1;
+  --st-center: #1E2A3A;
+  --rel-capital: #E8A0F7;
+  --rel-order: #168AEF;
+  --rel-intro: #FEA36A;
+  --rel-site: #ACACAC;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--body); background: var(--ground); color: var(--text); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* Filter bar */
+.filter-bar {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0; flex-wrap: wrap;
+}
+.filter-bar select {
+  padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 11px; font-family: var(--body); color: var(--text); background: var(--surface);
+}
+.filter-bar select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.filter-label { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+.filter-rest {
+  font-size: 10px; color: var(--text-muted); margin-left: auto;
+  font-family: var(--mono);
+}
+.pivot-btn {
+  display: block; width: 100%; margin-top: 8px; padding: 6px 0;
+  background: var(--accent); color: #fff; border: none; border-radius: 4px;
+  font-size: 11px; font-family: var(--body); font-weight: 600; cursor: pointer;
+}
+.pivot-btn:hover { opacity: 0.85; }
+.nav-back {
+  padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 11px; font-family: var(--body); color: var(--text); background: var(--surface);
+  cursor: pointer;
+}
+.nav-back:hover { background: var(--ground); }
+.nav-back:disabled { opacity: 0.3; cursor: default; }
+.nav-center { font-size: 12px; font-weight: 600; }
+
+/* Main area */
+.main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+.graph-area { flex: 1; position: relative; min-width: 0; }
+.graph-area canvas { width: 100%; height: 100%; display: block; cursor: grab; }
+.graph-area canvas.dragging { cursor: grabbing; }
+
+/* Info panel */
+.info-panel {
+  width: 260px; background: var(--surface);
+  border-left: 1px solid var(--border);
+  overflow-y: auto; flex-shrink: 0; font-size: 12px;
+}
+.info-header { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.info-name { font-family: var(--display); font-size: 15px; font-weight: 600; margin-bottom: 4px; line-height: 1.3; }
+.info-class { color: var(--text-muted); font-size: 11px; }
+.info-hint { font-size: 10px; color: var(--accent); margin-top: 6px; }
+.info-scores {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  background: var(--border); border-bottom: 1px solid var(--border);
+}
+.info-score-cell { background: var(--surface); padding: 8px 14px; }
+.info-score-label { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+.info-score-value { font-family: var(--mono); font-size: 16px; font-weight: 600; }
+.info-fields { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.info-field { display: flex; justify-content: space-between; padding: 3px 0; }
+.info-field-label { color: var(--text-muted); }
+.info-field-value { font-weight: 500; text-align: right; max-width: 140px; word-break: break-all; }
+.info-edges { padding: 10px 14px; }
+.info-edges-title { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+.info-edge-item { padding: 4px 0; border-bottom: 1px solid var(--ground); line-height: 1.4; }
+.info-edge-item:last-child { border-bottom: none; }
+.info-edge-name { font-weight: 500; }
+.info-edge-meta { font-size: 10px; color: var(--text-muted); }
+.info-edge-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+/* Legend */
+.legend-wrap {
+  position: absolute; bottom: 8px; left: 8px;
+  background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 4px;
+  font-size: 10px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;
+}
+.legend-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.legend-label { font-weight: 600; min-width: 36px; }
+.legend-item { display: flex; align-items: center; gap: 3px; }
+.legend-line { width: 16px; height: 0; border-top-width: 2px; border-top-style: solid; }
+.legend-line.dashed { border-top-style: dashed; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.state-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-muted); font-size: 13px; }
+.tip { position: absolute; background: var(--text); color: #E8E9ED; font-size: 11px; padding: 5px 9px; border-radius: 4px; pointer-events: none; opacity: 0; transition: opacity 0.1s; white-space: nowrap; z-index: 10; line-height: 1.4; }
+.tip.on { opacity: 1; }
+
+@media (max-width: 600px) { .info-panel { display: none; } }
+@media (prefers-reduced-motion: reduce) { .tip { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="filter-bar" id="filterBar" style="display:none">
+  <button class="nav-back" id="navBack" disabled onclick="pivotBack()">&lt; 戻る</button>
+  <span class="nav-center" id="navCenter"></span>
+  <span class="filter-label" style="margin-left:8px">タイプ</span>
+  <select id="fType"><option value="">全て</option><option value="資本支配">資本支配</option><option value="発注">発注</option><option value="紹介">紹介</option><option value="同現場">同現場</option></select>
+  <span class="filter-label">強さ</span>
+  <select id="fStr"><option value="">全て</option><option value="強">強</option><option value="中">中</option><option value="弱">弱</option></select>
+  <span class="filter-label">表示</span>
+  <select id="fLimit"><option value="15">15件</option><option value="30" selected>30件</option><option value="50">50件</option><option value="100">100件</option><option value="9999">全て</option></select>
+  <span class="filter-rest" id="fRest"></span>
+</div>
+
+<div class="main">
+  <div class="graph-area">
+    <canvas id="cv"></canvas>
+    <div class="tip" id="tip"></div>
+    <div class="state-msg" id="msg">データ読み込み中...</div>
+    <div class="legend-wrap" id="legend" style="display:none">
+      <div class="legend-row">
+        <span class="legend-label">関係</span>
+        <div class="legend-item"><span class="legend-line" style="border-color:var(--rel-capital)"></span>資本支配</div>
+        <div class="legend-item"><span class="legend-line" style="border-color:var(--rel-order)"></span>発注</div>
+        <div class="legend-item"><span class="legend-line" style="border-color:var(--rel-intro)"></span>紹介</div>
+        <div class="legend-item"><span class="legend-line dashed" style="border-color:var(--rel-site)"></span>同現場</div>
+      </div>
+      <div class="legend-row">
+        <span class="legend-label">状態</span>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--st-center)"></span>表示中</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--st-existing)"></span>既存</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--st-deal)"></span>商談中</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--st-contact)"></span>接触中</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--st-new)"></span>未取引</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--st-dormant)"></span>休眠</div>
+      </div>
+    </div>
+  </div>
+  <div class="info-panel" id="panel"><div id="panelContent">
+    <div class="info-header"><div class="info-name">-</div><div class="info-class">-</div></div>
+  </div></div>
+</div>
+
+<script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+<script>
+var IS_STUB = location.search.indexOf('stub=1') >= 0;
+var ZOHO_BASE = 'https://crm.zoho.jp/crm/org90001096836/tab/';
+var STR_RANK = { '強': 3, '中': 2, '弱': 1 };
+var navHistory = [];
+
+function stubGraph() {
+  var nodes = [
+    { id: '2', name: 'ダイダン', accountClass: 'サブコン', group: '齊藤', status: '既存顧客', influence: 1.8, priority: 5.4, owner: '齊藤' },
+    { id: '3', name: '大成建設', accountClass: 'ゼネコン', group: '川上', status: '商談中', influence: 1.2, priority: 3.6, owner: '川上' },
+    { id: '4', name: '鹿島建設', accountClass: 'ゼネコン', group: '石橋', status: '接触中', influence: 0.6, priority: 1.8, owner: '石橋' },
+    { id: '5', name: '朝日工業社', accountClass: 'サブコン', group: '山﨑', status: '未取引', influence: 0.3, priority: 0.9, owner: '山﨑' },
+    { id: '6', name: 'グローバルスタッフ', accountClass: '設備工事', group: '清水', status: '既存顧客', influence: 0.8, priority: 2.4, owner: '清水' },
+    { id: '7', name: '高砂熱学工業', accountClass: 'サブコン', group: '川上', status: '休眠', influence: 0.4, priority: 1.2, owner: '川上' },
+    { id: '8', name: 'ハンナエンジニアリング', accountClass: '設備工事', group: '清水', status: '既存顧客', influence: 1.1, priority: 3.3, owner: '清水' },
+    { id: '9', name: '三機工業', accountClass: 'サブコン', group: '齊藤', status: '既存顧客', influence: 2.1, priority: 6.3, owner: '齊藤' },
+    { id: '10', name: '東洋熱工業', accountClass: 'サブコン', group: '川上', status: '商談中', influence: 0.9, priority: 2.7, owner: '川上' },
+    { id: '11', name: '須賀工業', accountClass: 'サブコン', group: '石橋', status: '接触中', influence: 0.5, priority: 1.5, owner: '石橋' },
+    { id: '12', name: '大気社', accountClass: 'サブコン', group: '山﨑', status: '未取引', influence: 0.2, priority: 0.6, owner: '山﨑' }
+  ];
+  var edges = [
+    { sourceId: '1', targetId: '2', relType: '発注', strength: '強', memo: '大型案件で協力', recordId: 'e1' },
+    { sourceId: '1', targetId: '3', relType: '発注', strength: '中', memo: '元請として', recordId: 'e2' },
+    { sourceId: '1', targetId: '4', relType: '同現場', strength: '弱', memo: '業界つながり', recordId: 'e3' },
+    { sourceId: '1', targetId: '5', relType: '紹介', strength: '中', memo: '技術提携', recordId: 'e4' },
+    { sourceId: '1', targetId: '6', relType: '資本支配', strength: '強', memo: '', recordId: 'e5' },
+    { sourceId: '1', targetId: '7', relType: '同現場', strength: '中', memo: '渋谷再開発PJ', recordId: 'e6' },
+    { sourceId: '1', targetId: '8', relType: '発注', strength: '中', memo: 'ノートから', recordId: 'e7' },
+    { sourceId: '9', targetId: '1', relType: '発注', strength: '強', memo: '定期受注', recordId: 'e8' },
+    { sourceId: '10', targetId: '1', relType: '紹介', strength: '中', memo: '技術者紹介', recordId: 'e9' },
+    { sourceId: '1', targetId: '11', relType: '同現場', strength: '弱', memo: '品川PJ', recordId: 'e10' },
+    { sourceId: '1', targetId: '12', relType: '紹介', strength: '弱', memo: '', recordId: 'e11' },
+    { sourceId: '2', targetId: '3', relType: '発注', strength: '中', memo: '同業種', recordId: 'e12' },
+    { sourceId: '2', targetId: '9', relType: '同現場', strength: '強', memo: '横浜PJ', recordId: 'e13' },
+    { sourceId: '2', targetId: '7', relType: '紹介', strength: '弱', memo: '', recordId: 'e14' },
+    { sourceId: '3', targetId: '4', relType: '発注', strength: '強', memo: 'JV', recordId: 'e15' },
+    { sourceId: '3', targetId: '9', relType: '発注', strength: '中', memo: '設備一式', recordId: 'e16' },
+    { sourceId: '5', targetId: '8', relType: '発注', strength: '中', memo: '共同受注', recordId: 'e17' },
+    { sourceId: '6', targetId: '8', relType: '紹介', strength: '強', memo: '同グループ', recordId: 'e18' },
+    { sourceId: '9', targetId: '10', relType: '同現場', strength: '中', memo: '六本木PJ', recordId: 'e19' },
+    { sourceId: '9', targetId: '3', relType: '発注', strength: '強', memo: '大型空調', recordId: 'e20' }
+  ];
+  var allStubNodes = {};
+  allStubNodes['1'] = { id: '1', name: '新菱冷熱工業', accountClass: 'サブコン', group: '清水', status: '既存顧客', influence: 2.4, priority: 8.16, owner: '清水' };
+  nodes.forEach(function(n) { allStubNodes[n.id] = n; });
+
+  var cid = arguments[0] || '1';
+  var cn = allStubNodes[cid] || allStubNodes['1'];
+
+  var touchedEdges = edges.filter(function(e) { return e.sourceId === cid || e.targetId === cid; });
+  var neighborSet = {};
+  touchedEdges.forEach(function(e) {
+    if (e.sourceId !== cid) neighborSet[e.sourceId] = true;
+    if (e.targetId !== cid) neighborSet[e.targetId] = true;
+  });
+  var visNodes = Object.keys(neighborSet).map(function(nid) { return allStubNodes[nid] || { id: nid, name: nid }; }).filter(Boolean);
+
+  return { centerNode: cn, nodes: visNodes, edges: touchedEdges };
+}
+
+// ── Data Layer ──
+var EDGE_QUERY = "SELECT id, field1, field, field3, field4, field2 FROM CustomModule1 WHERE (field1 = '{id}' or field = '{id}') LIMIT 200";
+var ACCT_QUERY = "SELECT id, Account_Name, field, field6, field15, field16, field17, Owner FROM Accounts WHERE id in ({ids}) LIMIT 200";
+var ACCT_SINGLE = "SELECT id, Account_Name, field, field6, field15, field16, field17, Owner FROM Accounts WHERE id = '{id}' LIMIT 1";
+
+function fetchGraph(entityId) {
+  var edgeQ = EDGE_QUERY.replace(/\{id\}/g, entityId);
+  return ZOHO.CRM.API.coql({ select_query: edgeQ }).then(function(resp) {
+    var raw = (resp && resp.data) || [];
+    var neighborIds = {};
+    var edges = [];
+    raw.forEach(function(r) {
+      var srcId = r.field1 ? String(r.field1.id) : '';
+      var tgtId = r.field ? String(r.field.id) : '';
+      if (!srcId || !tgtId) return;
+      edges.push({
+        sourceId: srcId, sourceName: r.field1.name || '',
+        targetId: tgtId, targetName: (r.field && r.field.name) || '',
+        strength: r.field3 || '', relType: r.field4 || '',
+        memo: r.field2 || '', recordId: String(r.id || '')
+      });
+      if (srcId !== entityId) neighborIds[srcId] = r.field1.name || '';
+      if (tgtId !== entityId) neighborIds[tgtId] = (r.field && r.field.name) || '';
+    });
+    var ids = Object.keys(neighborIds);
+    if (ids.length === 0) {
+      return fetchSingleAccount(entityId).then(function(cn) { return { centerNode: cn, nodes: [], edges: edges }; });
+    }
+    var inClause = ids.map(function(i) { return "'" + i + "'"; }).join(',');
+    return ZOHO.CRM.API.coql({ select_query: ACCT_QUERY.replace('{ids}', inClause) }).then(function(acctResp) {
+      var acctData = (acctResp && acctResp.data) || [];
+      var acctMap = {}; acctData.forEach(function(a) { acctMap[String(a.id)] = a; });
+      var nodes = ids.map(function(nid) { return parseAccount(nid, acctMap[nid] || {}, neighborIds[nid]); });
+      if (acctMap[entityId]) return { centerNode: parseAccount(entityId, acctMap[entityId], ''), nodes: nodes, edges: edges };
+      return fetchSingleAccount(entityId).then(function(cn) { return { centerNode: cn, nodes: nodes, edges: edges }; });
+    });
+  });
+}
+function fetchSingleAccount(id) {
+  return ZOHO.CRM.API.coql({ select_query: ACCT_SINGLE.replace('{id}', id) }).then(function(r) {
+    return parseAccount(id, (r && r.data && r.data[0]) || {}, '');
+  });
+}
+function parseAccount(id, a, fb) {
+  return { id: id, name: a.Account_Name || fb || id, accountClass: a.field || '', group: a.field6 || '', status: a.field15 || '',
+    influence: parseFloat(a.field16) || 0, priority: parseFloat(a.field17) || 0, owner: (a.Owner && a.Owner.name) || '' };
+}
+
+// ── Constants ──
+var STATUS_COLOR = { '既存顧客': '#059669', '既存顧客（要フォロー）': '#059669', '商談中': '#2563EB', '接触中': '#D97706', '未取引': '#94A3B8', '休眠': '#CBD5E1' };
+var CENTER_COLOR = '#1E2A3A';
+var REL_COLOR = { '資本支配': '#E8A0F7', '発注': '#168AEF', '紹介': '#FEA36A', '同現場': '#ACACAC' };
+var STR_WIDTH = { '強': 2.5, '中': 1.5, '弱': 1 };
+
+// ── State ──
+var cv, ctx, wrap, tipEl, msgEl;
+var gW, gH, dpr;
+var gNodes = [], gEdges = [];
+var allEdges = [], allNodeMap = {};
+var centerId = '';
+var dragging = null, hoverIdx = -1;
+var selType = null, selIdx = -1;
+var animId = null;
+
+// ── Filtering ──
+function applyFilters() {
+  var fType = document.getElementById('fType').value;
+  var fStr = document.getElementById('fStr').value;
+  var fLimit = parseInt(document.getElementById('fLimit').value) || 30;
+
+  // 1-hop only: edges that touch center
+  var filtered = allEdges.filter(function(e) {
+    if (e.sourceId !== centerId && e.targetId !== centerId) return false;
+    if (fType && e.relType !== fType) return false;
+    if (fStr && e.strength !== fStr) return false;
+    return true;
+  });
+
+  // sort by strength rank descending
+  filtered.sort(function(a, b) { return (STR_RANK[b.strength] || 0) - (STR_RANK[a.strength] || 0); });
+
+  var totalFiltered = filtered.length;
+  var shown = filtered.slice(0, fLimit);
+  var hidden = totalFiltered - shown.length;
+
+  document.getElementById('fRest').textContent = hidden > 0 ? '他に ' + hidden + ' 件' : totalFiltered + ' 件';
+
+  // collect visible neighbor IDs
+  var visIds = {};
+  shown.forEach(function(e) {
+    if (e.sourceId !== centerId) visIds[e.sourceId] = true;
+    if (e.targetId !== centerId) visIds[e.targetId] = true;
+  });
+
+  // rebuild gNodes
+  var idMap = {};
+  var cn = allNodeMap[centerId];
+  gNodes = [{ id: cn.id, label: cn.name, isCenter: true, color: CENTER_COLOR,
+    accountClass: cn.accountClass, group: cn.group, status: cn.status,
+    influence: cn.influence, priority: cn.priority, owner: cn.owner,
+    x: gW / 2, y: gH / 2, vx: 0, vy: 0, hw: 0, hh: 0 }];
+  idMap[cn.id] = 0;
+
+  var neighborIds = Object.keys(visIds);
+  neighborIds.forEach(function(nid, i) {
+    var n = allNodeMap[nid] || { id: nid, name: nid };
+    var ang = (2 * Math.PI * i) / neighborIds.length - Math.PI / 2;
+    var rad = Math.min(gW, gH) * 0.3;
+    gNodes.push({ id: n.id, label: n.name, isCenter: false,
+      color: STATUS_COLOR[n.status] || '#94A3B8',
+      accountClass: n.accountClass || '', group: n.group || '', status: n.status || '',
+      influence: n.influence || 0, priority: n.priority || 0, owner: n.owner || '',
+      x: gW / 2 + rad * Math.cos(ang), y: gH / 2 + rad * Math.sin(ang),
+      vx: 0, vy: 0, hw: 0, hh: 0 });
+    idMap[n.id] = gNodes.length - 1;
+  });
+
+  gEdges = [];
+  shown.forEach(function(e) {
+    var si = idMap[e.sourceId], ti = idMap[e.targetId];
+    if (si === undefined || ti === undefined) return;
+    gEdges.push({ si: si, ti: ti, relType: e.relType, strength: e.strength, memo: e.memo, recordId: e.recordId || '' });
+  });
+
+  selType = 'node'; selIdx = 0;
+  showNodePanel(gNodes[0]);
+}
+
+// ── Simulation ──
+function simulate() {
+  var rep = 3500, sk = 0.007, grav = 0.012, damp = 0.82;
+  var sl = Math.min(gW, gH) * 0.22;
+  var cx = gW / 2, cy = gH / 2;
+  for (var i = 0; i < gNodes.length; i++) {
+    var fx = 0, fy = 0, ni = gNodes[i];
+    for (var j = 0; j < gNodes.length; j++) {
+      if (i === j) continue;
+      var dx = ni.x - gNodes[j].x, dy = ni.y - gNodes[j].y;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      fx += (dx / d) * (rep / (d * d)); fy += (dy / d) * (rep / (d * d));
+    }
+    for (var k = 0; k < gEdges.length; k++) {
+      var e = gEdges[k], oi = -1;
+      if (e.si === i) oi = e.ti; else if (e.ti === i) oi = e.si;
+      if (oi < 0) continue;
+      var dx2 = gNodes[oi].x - ni.x, dy2 = gNodes[oi].y - ni.y;
+      var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) || 1;
+      fx += (dx2 / d2) * (d2 - sl) * sk; fy += (dy2 / d2) * (d2 - sl) * sk;
+    }
+    fx += (cx - ni.x) * grav; fy += (cy - ni.y) * grav;
+    if (dragging !== i) { ni.vx = (ni.vx + fx) * damp; ni.vy = (ni.vy + fy) * damp; ni.x += ni.vx; ni.y += ni.vy; }
+    ni.x = Math.max(70, Math.min(gW - 70, ni.x));
+    ni.y = Math.max(24, Math.min(gH - 24, ni.y));
+  }
+}
+
+// ── Arrow ──
+function drawArrow(fx, fy, tx, ty, hw, hh, color, lw) {
+  var dx = tx - fx, dy = ty - fy, dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 1) return;
+  var ux = dx / dist, uy = dy / dist;
+  var off = Math.max(hw, hh) + 4;
+  var ax = tx - ux * off, ay = ty - uy * off;
+  var hl = 6 + lw * 2, hw2 = 3 + lw;
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(ax - ux * hl + (-uy) * hw2, ay - uy * hl + ux * hw2);
+  ctx.lineTo(ax - ux * hl - (-uy) * hw2, ay - uy * hl - ux * hw2);
+  ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+}
+
+function hasBidir(ei) {
+  var e = gEdges[ei];
+  for (var k = 0; k < gEdges.length; k++) { if (k !== ei && gEdges[k].si === e.ti && gEdges[k].ti === e.si) return true; }
+  return false;
+}
+
+// ── Drawing ──
+function rrect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, gW, gH);
+  var fontD = '"Segoe UI Variable Display", "Yu Gothic UI", sans-serif';
+  var fontM = '"Cascadia Code", "Consolas", monospace';
+
+  for (var k = 0; k < gEdges.length; k++) {
+    var e = gEdges[k], a = gNodes[e.si], b = gNodes[e.ti];
+    var esel = (selType === 'edge' && selIdx === k);
+    var color = REL_COLOR[e.relType] || '#ACACAC';
+    var lw = STR_WIDTH[e.strength] || 1.5;
+    if (esel) lw += 1.5;
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = lw;
+    ctx.globalAlpha = esel ? 1 : 0.7;
+    if (e.strength === '弱') ctx.setLineDash([5, 4]); else ctx.setLineDash([]);
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    drawArrow(a.x, a.y, b.x, b.y, b.hw || 30, b.hh || 14, color, lw);
+    if (hasBidir(k)) drawArrow(b.x, b.y, a.x, a.y, a.hw || 30, a.hh || 14, color, lw);
+    if (esel) { var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2); ctx.fillStyle = '#2563EB'; ctx.fill(); }
+  }
+
+  for (var i = 0; i < gNodes.length; i++) {
+    var n = gNodes[i], hover = (hoverIdx === i), nsel = (selType === 'node' && selIdx === i);
+    var fs = n.isCenter ? 13 : 11, fw = n.isCenter ? '600' : '500';
+    ctx.font = fw + ' ' + fs + 'px ' + fontD;
+    var nameW = ctx.measureText(n.label).width;
+    var st = n.influence > 0 ? n.influence.toFixed(1) : '';
+    ctx.font = '500 9px ' + fontM;
+    var sW = st ? ctx.measureText(st).width : 0;
+    var tw = Math.max(nameW, sW), px = 12, py = st ? 6 : 8;
+    var bw = tw + px * 2, bh = (st ? fs + 12 : fs) + py * 2, br = bh / 2;
+    n.hw = bw / 2; n.hh = bh / 2;
+
+    ctx.save();
+    ctx.shadowColor = hover || nsel ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.08)';
+    ctx.shadowBlur = hover || nsel ? 10 : 4; ctx.shadowOffsetY = 1;
+    rrect(n.x - bw / 2, n.y - bh / 2, bw, bh, br); ctx.fillStyle = n.color; ctx.fill(); ctx.restore();
+
+    if (nsel || hover) {
+      rrect(n.x - bw / 2 - 1, n.y - bh / 2 - 1, bw + 2, bh + 2, br + 1);
+      ctx.strokeStyle = nsel ? '#2563EB' : 'rgba(255,255,255,0.5)'; ctx.lineWidth = nsel ? 2 : 1.5; ctx.stroke();
+    }
+    ctx.font = fw + ' ' + fs + 'px ' + fontD; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(n.label, n.x, st ? n.y - 5 : n.y + 0.5);
+    if (st) { ctx.font = '500 9px ' + fontM; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(st, n.x, n.y + 7); }
+  }
+}
+
+// ── Hit Testing ──
+function hitNode(mx, my) { for (var i = gNodes.length - 1; i >= 0; i--) { var n = gNodes[i]; if (Math.abs(mx - n.x) < (n.hw || 40) + 4 && Math.abs(my - n.y) < (n.hh || 16) + 4) return i; } return -1; }
+function hitEdgeIdx(mx, my) {
+  for (var k = 0; k < gEdges.length; k++) {
+    var e = gEdges[k], a = gNodes[e.si], b = gNodes[e.ti];
+    var dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy; if (!l2) continue;
+    var t = Math.max(0, Math.min(1, ((mx - a.x) * dx + (my - a.y) * dy) / l2));
+    var px = a.x + t * dx, py = a.y + t * dy;
+    if (Math.sqrt((mx - px) * (mx - px) + (my - py) * (my - py)) < 8) return k;
+  } return -1;
+}
+
+// ── Events ──
+function pos(ev) { var r = cv.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
+function onDown(ev) { var p = pos(ev), i = hitNode(p.x, p.y); if (i >= 0) { dragging = i; gNodes[i].vx = 0; gNodes[i].vy = 0; cv.classList.add('dragging'); } }
+function onMove(ev) {
+  var p = pos(ev);
+  if (dragging !== null) { gNodes[dragging].x = p.x; gNodes[dragging].y = p.y; return; }
+  var i = hitNode(p.x, p.y);
+  if (i >= 0) { hoverIdx = i; cv.style.cursor = 'pointer'; var n = gNodes[i]; tipEl.innerHTML = '<strong>' + n.label + '</strong>' + (n.accountClass ? ' ' + n.accountClass : ''); tipEl.classList.add('on'); tipEl.style.left = Math.min(p.x + 12, gW - tipEl.offsetWidth - 8) + 'px'; tipEl.style.top = (p.y - 8) + 'px'; return; }
+  var ei = hitEdgeIdx(p.x, p.y);
+  if (ei >= 0) { hoverIdx = -1; cv.style.cursor = 'pointer'; var e = gEdges[ei]; tipEl.innerHTML = gNodes[e.si].label + ' → ' + gNodes[e.ti].label + '<br>' + e.relType + ' / ' + e.strength + (e.memo ? '<br>' + e.memo : ''); tipEl.classList.add('on'); tipEl.style.left = Math.min(p.x + 12, gW - tipEl.offsetWidth - 8) + 'px'; tipEl.style.top = (p.y - 8) + 'px'; return; }
+  hoverIdx = -1; cv.style.cursor = 'grab'; tipEl.classList.remove('on');
+}
+function onUp() { dragging = null; cv.classList.remove('dragging'); }
+function onClick(ev) {
+  var p = pos(ev), ni = hitNode(p.x, p.y);
+  if (ni >= 0) { if (selType === 'node' && selIdx === ni) openNode(gNodes[ni]); else { selType = 'node'; selIdx = ni; showNodePanel(gNodes[ni]); } return; }
+  var ei = hitEdgeIdx(p.x, p.y);
+  if (ei >= 0) { if (selType === 'edge' && selIdx === ei) openEdge(gEdges[ei]); else { selType = 'edge'; selIdx = ei; showEdgePanel(gEdges[ei]); } return; }
+  selType = null; selIdx = -1; showEmptyPanel();
+}
+function openNode(n) { if (IS_STUB) window.open(ZOHO_BASE + 'Accounts/' + n.id, '_blank'); else ZOHO.CRM.UI.Record.open({ Entity: "Accounts", RecordID: n.id }); }
+function openEdge(e) { if (!e.recordId) return; if (IS_STUB) window.open(ZOHO_BASE + 'CustomModule1/' + e.recordId, '_blank'); else ZOHO.CRM.UI.Record.open({ Entity: "CustomModule1", RecordID: e.recordId }); }
+function onTouchStart(ev) { ev.preventDefault(); var t = ev.touches[0], p = pos(t), i = hitNode(p.x, p.y); if (i >= 0) { dragging = i; gNodes[i].vx = 0; gNodes[i].vy = 0; } }
+function onTouchMove(ev) { ev.preventDefault(); if (dragging === null) return; var t = ev.touches[0], p = pos(t); gNodes[dragging].x = p.x; gNodes[dragging].y = p.y; }
+
+// ── Panel ──
+function showNodePanel(node) {
+  var isCenter = node.isCenter;
+  var h = '<div class="info-header"><div class="info-name">' + esc(node.label) + '</div><div class="info-class">' + esc([node.accountClass, node.group].filter(Boolean).join(' / ')) + '</div><div class="info-hint">再クリックで Zoho を開く</div>';
+  if (!isCenter) h += '<button class="pivot-btn" onclick="pivotTo(\'' + esc(node.id) + '\')">この企業を中心に表示</button>';
+  h += '</div>';
+  h += '<div class="info-scores"><div class="info-score-cell"><div class="info-score-label">影響度</div><div class="info-score-value">' + (node.influence > 0 ? node.influence.toFixed(2) : '-') + '</div></div><div class="info-score-cell"><div class="info-score-label">優先度</div><div class="info-score-value">' + (node.priority > 0 ? node.priority.toFixed(2) : '-') + '</div></div></div>';
+  var f = '';
+  if (node.status) f += '<div class="info-field"><span class="info-field-label">ステータス</span><span class="info-field-value">' + esc(node.status) + '</span></div>';
+  if (node.owner) f += '<div class="info-field"><span class="info-field-label">担当</span><span class="info-field-value">' + esc(node.owner) + '</span></div>';
+  if (f) h += '<div class="info-fields">' + f + '</div>';
+  var ni = gNodes.indexOf(node), eh = '';
+  gEdges.forEach(function(e) {
+    var other, dir; if (e.si === ni) { other = gNodes[e.ti]; dir = '→'; } else if (e.ti === ni) { other = gNodes[e.si]; dir = '←'; } else return;
+    eh += '<div class="info-edge-item"><span class="info-edge-dot" style="background:' + (REL_COLOR[e.relType] || '#ACACAC') + '"></span><span class="info-edge-name">' + dir + ' ' + esc(other.label) + '</span><div class="info-edge-meta">' + esc(e.relType) + ' / ' + esc(e.strength) + (e.memo ? ' - ' + esc(e.memo) : '') + '</div></div>';
+  });
+  if (eh) h += '<div class="info-edges"><div class="info-edges-title">関係性</div>' + eh + '</div>';
+  document.getElementById('panelContent').innerHTML = h;
+}
+function showEdgePanel(edge) {
+  var src = gNodes[edge.si], tgt = gNodes[edge.ti], c = REL_COLOR[edge.relType] || '#ACACAC';
+  var h = '<div class="info-header"><div class="info-name"><span class="info-edge-dot" style="background:' + c + '"></span>' + esc(edge.relType) + ' / ' + esc(edge.strength) + '</div><div class="info-class">' + esc(src.label) + ' → ' + esc(tgt.label) + '</div><div class="info-hint">再クリックで Zoho を開く</div></div>';
+  var f = '<div class="info-field"><span class="info-field-label">起点</span><span class="info-field-value">' + esc(src.label) + '</span></div>';
+  f += '<div class="info-field"><span class="info-field-label">終点</span><span class="info-field-value">' + esc(tgt.label) + '</span></div>';
+  f += '<div class="info-field"><span class="info-field-label">タイプ</span><span class="info-field-value">' + esc(edge.relType) + '</span></div>';
+  f += '<div class="info-field"><span class="info-field-label">強さ</span><span class="info-field-value">' + esc(edge.strength) + '</span></div>';
+  if (edge.memo) f += '<div class="info-field"><span class="info-field-label">メモ</span><span class="info-field-value">' + esc(edge.memo) + '</span></div>';
+  h += '<div class="info-fields">' + f + '</div>';
+  h += '<div class="info-edges"><div class="info-edges-title">接続ノード</div>';
+  [src, tgt].forEach(function(n) { h += '<div class="info-edge-item"><span class="info-edge-dot" style="background:' + n.color + '"></span><span class="info-edge-name">' + esc(n.label) + '</span><div class="info-edge-meta">' + esc([n.accountClass, n.status].filter(Boolean).join(' / ')) + (n.influence > 0 ? ' / 影響度 ' + n.influence.toFixed(1) : '') + '</div></div>'; });
+  h += '</div>';
+  document.getElementById('panelContent').innerHTML = h;
+}
+function showEmptyPanel() { document.getElementById('panelContent').innerHTML = '<div class="info-header"><div class="info-name">-</div><div class="info-class">ノードまたはエッジをクリック</div></div>'; }
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+
+// ── Canvas ──
+function resizeCanvas() {
+  var r = wrap.getBoundingClientRect(); dpr = window.devicePixelRatio || 1;
+  gW = r.width; gH = r.height; cv.width = gW * dpr; cv.height = gH * dpr;
+  cv.style.width = gW + 'px'; cv.style.height = gH + 'px'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// ── Render ──
+function renderGraph(graph) {
+  centerId = graph.centerNode.id;
+  allNodeMap = {};
+  allNodeMap[graph.centerNode.id] = graph.centerNode;
+  graph.nodes.forEach(function(n) { allNodeMap[n.id] = n; });
+  allEdges = graph.edges;
+
+  msgEl.style.display = 'none';
+  document.getElementById('legend').style.display = 'flex';
+  document.getElementById('filterBar').style.display = 'flex';
+
+  updateNav();
+  applyFilters();
+
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (animId) cancelAnimationFrame(animId);
+  if (reduced) { for (var i = 0; i < 200; i++) simulate(); draw(); }
+  else { (function tick() { simulate(); draw(); animId = requestAnimationFrame(tick); })(); }
+}
+
+function onFilterChange() {
+  applyFilters();
+}
+
+function pivotTo(nodeId) {
+  navHistory.push(centerId);
+  loadCenter(nodeId);
+}
+
+function pivotBack() {
+  if (navHistory.length === 0) return;
+  var prevId = navHistory.pop();
+  loadCenter(prevId);
+}
+
+function loadCenter(nodeId) {
+  msgEl.style.display = 'block'; msgEl.textContent = 'データ読み込み中...';
+  document.getElementById('fType').value = '';
+  document.getElementById('fStr').value = '';
+
+  if (IS_STUB) {
+    renderGraph(stubGraph(nodeId));
+  } else {
+    fetchGraph(nodeId).then(function(graph) {
+      if (graph.edges.length === 0) {
+        msgEl.textContent = graph.centerNode.name + ' には関係性が登録されていません';
+        return;
+      }
+      renderGraph(graph);
+    }).catch(function(err) { msgEl.textContent = 'エラー: ' + (err.message || JSON.stringify(err)); });
+  }
+}
+
+function updateNav() {
+  var cn = allNodeMap[centerId];
+  document.getElementById('navCenter').textContent = cn ? cn.name : '';
+  document.getElementById('navBack').disabled = navHistory.length === 0;
+}
+
+// ── Init ──
+function initCanvas() {
+  cv = document.getElementById('cv'); ctx = cv.getContext('2d');
+  wrap = document.querySelector('.graph-area'); tipEl = document.getElementById('tip'); msgEl = document.getElementById('msg');
+  resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+  cv.addEventListener('mousedown', onDown); cv.addEventListener('mousemove', onMove);
+  cv.addEventListener('mouseup', onUp); cv.addEventListener('mouseleave', function() { onUp(); tipEl.classList.remove('on'); hoverIdx = -1; });
+  cv.addEventListener('click', onClick);
+  cv.addEventListener('touchstart', onTouchStart, { passive: false }); cv.addEventListener('touchmove', onTouchMove, { passive: false }); cv.addEventListener('touchend', onUp);
+  document.getElementById('fType').addEventListener('change', onFilterChange);
+  document.getElementById('fStr').addEventListener('change', onFilterChange);
+  document.getElementById('fLimit').addEventListener('change', onFilterChange);
+}
+
+// ── Boot ──
+if (IS_STUB) {
+  document.addEventListener('DOMContentLoaded', function() { initCanvas(); renderGraph(stubGraph()); });
+} else {
+  ZOHO.embeddedApp.on("PageLoad", function(data) {
+    initCanvas();
+    if (data.Entity !== "Accounts") { msgEl.textContent = "Accounts モジュールでのみ動作します"; return; }
+    fetchGraph(String(data.EntityId)).then(function(graph) {
+      if (graph.edges.length === 0) {
+        msgEl.textContent = graph.centerNode.name + " には関係性が登録されていません";
+        showNodePanel({ label: graph.centerNode.name, accountClass: graph.centerNode.accountClass, group: graph.centerNode.group, status: graph.centerNode.status, influence: graph.centerNode.influence, priority: graph.centerNode.priority, owner: graph.centerNode.owner });
+        return;
+      }
+      renderGraph(graph);
+    }).catch(function(err) { msgEl.textContent = "エラー: " + (err.message || JSON.stringify(err)); });
+  });
+  ZOHO.embeddedApp.init();
+}
+</script>
+</body>
+</html>

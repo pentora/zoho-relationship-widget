@@ -304,13 +304,14 @@ var centerId = '';
 var dragging = null, hoverIdx = -1;
 var selType = null, selIdx = -1;
 var animId = null;
+var panX = 0, panY = 0, panning = false, panStartX = 0, panStartY = 0, panStartPX = 0, panStartPY = 0;
 
 // ── Filtering ──
 function buildDynamicFilters() {
-  var owners = {}, states = {};
+  var groups = {}, states = {};
   Object.keys(allNodeMap).forEach(function(nid) {
     var n = allNodeMap[nid];
-    if (n.owner) owners[n.owner] = true;
+    if (n.group) groups[n.group] = true;
     if (n.shippingState) states[n.shippingState] = true;
   });
   var fOwner = document.getElementById('fOwner');
@@ -318,8 +319,8 @@ function buildDynamicFilters() {
   var curOwner = fOwner.value, curState = fState.value;
   fOwner.innerHTML = '<option value="">全て</option>';
   fState.innerHTML = '<option value="">全て</option>';
-  Object.keys(owners).sort().forEach(function(o) {
-    fOwner.innerHTML += '<option value="' + esc(o) + '">' + esc(o) + '</option>';
+  Object.keys(groups).sort().forEach(function(g) {
+    fOwner.innerHTML += '<option value="' + esc(g) + '">' + esc(g) + '</option>';
   });
   Object.keys(states).sort().forEach(function(s) {
     fState.innerHTML += '<option value="' + esc(s) + '">' + esc(s) + '</option>';
@@ -339,12 +340,12 @@ function applyFilters() {
     if (e.sourceId !== centerId && e.targetId !== centerId) return false;
     if (fType && e.relType !== fType) return false;
     if (fStr && e.strength !== fStr) return false;
-    // filter by neighbor's owner or state
+    // filter by neighbor's group or state
     if (fOwner || fState) {
       var neighborId = (e.sourceId === centerId) ? e.targetId : e.sourceId;
       var n = allNodeMap[neighborId];
       if (!n) return false;
-      if (fOwner && n.owner !== fOwner) return false;
+      if (fOwner && n.group !== fOwner) return false;
       if (fState && n.shippingState !== fState) return false;
     }
     return true;
@@ -398,6 +399,7 @@ function applyFilters() {
     gEdges.push({ si: si, ti: ti, relType: e.relType, strength: e.strength, memo: e.memo, recordId: e.recordId || '' });
   });
 
+  panX = 0; panY = 0;
   selType = 'node'; selIdx = 0;
   showNodePanel(gNodes[0]);
 }
@@ -468,6 +470,8 @@ function rrect(x, y, w, h, r) {
 
 function draw() {
   ctx.clearRect(0, 0, gW, gH);
+  ctx.save();
+  ctx.translate(panX, panY);
   var fontD = '"Segoe UI Variable Display", "Yu Gothic UI", sans-serif';
   var fontM = '"Cascadia Code", "Consolas", monospace';
 
@@ -512,6 +516,7 @@ function draw() {
     ctx.fillText(n.label, n.x, st ? n.y - 5 : n.y + 0.5);
     if (st) { ctx.font = '500 9px ' + fontM; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(st, n.x, n.y + 7); }
   }
+  ctx.restore();
 }
 
 // ── Hit Testing ──
@@ -528,28 +533,47 @@ function hitEdgeIdx(mx, my) {
 
 // ── Events ──
 function pos(ev) { var r = cv.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
-function onDown(ev) { var p = pos(ev), i = hitNode(p.x, p.y); if (i >= 0) { dragging = i; gNodes[i].vx = 0; gNodes[i].vy = 0; cv.classList.add('dragging'); } }
+function worldPos(ev) { var p = pos(ev); return { x: p.x - panX, y: p.y - panY, sx: p.x, sy: p.y }; }
+function onDown(ev) {
+  var p = worldPos(ev);
+  var i = hitNode(p.x, p.y);
+  if (i >= 0) { dragging = i; gNodes[i].vx = 0; gNodes[i].vy = 0; cv.classList.add('dragging'); }
+  else { panning = true; panStartX = p.sx; panStartY = p.sy; panStartPX = panX; panStartPY = panY; cv.style.cursor = 'move'; }
+}
 function onMove(ev) {
-  var p = pos(ev);
+  var p = worldPos(ev);
+  if (panning) { panX = panStartPX + (p.sx - panStartX); panY = panStartPY + (p.sy - panStartY); return; }
   if (dragging !== null) { gNodes[dragging].x = p.x; gNodes[dragging].y = p.y; return; }
   var i = hitNode(p.x, p.y);
-  if (i >= 0) { hoverIdx = i; cv.style.cursor = 'pointer'; var n = gNodes[i]; tipEl.innerHTML = '<strong>' + n.label + '</strong>' + (n.accountClass ? ' ' + n.accountClass : ''); tipEl.classList.add('on'); tipEl.style.left = Math.min(p.x + 12, gW - tipEl.offsetWidth - 8) + 'px'; tipEl.style.top = (p.y - 8) + 'px'; return; }
+  if (i >= 0) { hoverIdx = i; cv.style.cursor = 'pointer'; var n = gNodes[i]; tipEl.innerHTML = '<strong>' + n.label + '</strong>' + (n.accountClass ? ' ' + n.accountClass : ''); tipEl.classList.add('on'); tipEl.style.left = Math.min(p.sx + 12, gW - tipEl.offsetWidth - 8) + 'px'; tipEl.style.top = (p.sy - 8) + 'px'; return; }
   var ei = hitEdgeIdx(p.x, p.y);
-  if (ei >= 0) { hoverIdx = -1; cv.style.cursor = 'pointer'; var e = gEdges[ei]; tipEl.innerHTML = gNodes[e.si].label + ' → ' + gNodes[e.ti].label + '<br>' + e.relType + ' / ' + e.strength + (e.memo ? '<br>' + e.memo : ''); tipEl.classList.add('on'); tipEl.style.left = Math.min(p.x + 12, gW - tipEl.offsetWidth - 8) + 'px'; tipEl.style.top = (p.y - 8) + 'px'; return; }
+  if (ei >= 0) { hoverIdx = -1; cv.style.cursor = 'pointer'; var e = gEdges[ei]; tipEl.innerHTML = gNodes[e.si].label + ' → ' + gNodes[e.ti].label + '<br>' + e.relType + ' / ' + e.strength + (e.memo ? '<br>' + e.memo : ''); tipEl.classList.add('on'); tipEl.style.left = Math.min(p.sx + 12, gW - tipEl.offsetWidth - 8) + 'px'; tipEl.style.top = (p.sy - 8) + 'px'; return; }
   hoverIdx = -1; cv.style.cursor = 'grab'; tipEl.classList.remove('on');
 }
-function onUp() { dragging = null; cv.classList.remove('dragging'); }
+function onUp() { dragging = null; panning = false; cv.classList.remove('dragging'); cv.style.cursor = 'grab'; }
 function onClick(ev) {
-  var p = pos(ev), ni = hitNode(p.x, p.y);
+  if (panning) return;
+  var p = worldPos(ev), ni = hitNode(p.x, p.y);
   if (ni >= 0) { if (selType === 'node' && selIdx === ni) openNode(gNodes[ni]); else { selType = 'node'; selIdx = ni; showNodePanel(gNodes[ni]); } return; }
   var ei = hitEdgeIdx(p.x, p.y);
+
   if (ei >= 0) { if (selType === 'edge' && selIdx === ei) openEdge(gEdges[ei]); else { selType = 'edge'; selIdx = ei; showEdgePanel(gEdges[ei]); } return; }
   selType = null; selIdx = -1; showEmptyPanel();
 }
 function openNode(n) { if (IS_STUB) window.open(ZOHO_BASE + 'Accounts/' + n.id, '_blank'); else ZOHO.CRM.UI.Record.open({ Entity: "Accounts", RecordID: n.id }); }
 function openEdge(e) { if (!e.recordId) return; if (IS_STUB) window.open(ZOHO_BASE + 'CustomModule1/' + e.recordId, '_blank'); else ZOHO.CRM.UI.Record.open({ Entity: "CustomModule1", RecordID: e.recordId }); }
-function onTouchStart(ev) { ev.preventDefault(); var t = ev.touches[0], p = pos(t), i = hitNode(p.x, p.y); if (i >= 0) { dragging = i; gNodes[i].vx = 0; gNodes[i].vy = 0; } }
-function onTouchMove(ev) { ev.preventDefault(); if (dragging === null) return; var t = ev.touches[0], p = pos(t); gNodes[dragging].x = p.x; gNodes[dragging].y = p.y; }
+function onTouchStart(ev) {
+  ev.preventDefault(); var t = ev.touches[0], p = worldPos(t);
+  var i = hitNode(p.x, p.y);
+  if (i >= 0) { dragging = i; gNodes[i].vx = 0; gNodes[i].vy = 0; }
+  else { panning = true; panStartX = p.sx; panStartY = p.sy; panStartPX = panX; panStartPY = panY; }
+}
+function onTouchMove(ev) {
+  ev.preventDefault(); var t = ev.touches[0], p = worldPos(t);
+  if (panning) { panX = panStartPX + (p.sx - panStartX); panY = panStartPY + (p.sy - panStartY); return; }
+  if (dragging === null) return;
+  gNodes[dragging].x = p.x; gNodes[dragging].y = p.y;
+}
 
 // ── Panel ──
 function showNodePanel(node) {

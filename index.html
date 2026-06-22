@@ -58,6 +58,8 @@ body { font-family: var(--body); background: var(--ground); color: var(--text); 
 .nav-back:hover { background: var(--ground); }
 .nav-back:disabled { opacity: 0.3; cursor: default; }
 .nav-center { font-size: 12px; font-weight: 600; }
+.clickable { cursor: pointer; }
+.clickable:hover { color: var(--accent); }
 
 /* Main area */
 .main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
@@ -124,6 +126,10 @@ body { font-family: var(--body); background: var(--ground); color: var(--text); 
   <select id="fType"><option value="">全て</option><option value="資本支配">資本支配</option><option value="発注">発注</option><option value="紹介">紹介</option><option value="同現場">同現場</option></select>
   <span class="filter-label">強さ</span>
   <select id="fStr"><option value="">全て</option><option value="強">強</option><option value="中">中</option><option value="弱">弱</option></select>
+  <span class="filter-label">担当</span>
+  <select id="fOwner"><option value="">全て</option></select>
+  <span class="filter-label">都道府県</span>
+  <select id="fState"><option value="">全て</option></select>
   <span class="filter-label">表示</span>
   <select id="fLimit"><option value="15">15件</option><option value="30" selected>30件</option><option value="50">50件</option><option value="100">100件</option><option value="9999">全て</option></select>
   <span class="filter-rest" id="fRest"></span>
@@ -167,17 +173,17 @@ var navHistory = [];
 
 function stubGraph() {
   var nodes = [
-    { id: '2', name: 'ダイダン', accountClass: 'サブコン', group: '齊藤', status: '既存顧客', influence: 1.8, priority: 5.4, owner: '齊藤' },
-    { id: '3', name: '大成建設', accountClass: 'ゼネコン', group: '川上', status: '商談中', influence: 1.2, priority: 3.6, owner: '川上' },
-    { id: '4', name: '鹿島建設', accountClass: 'ゼネコン', group: '石橋', status: '接触中', influence: 0.6, priority: 1.8, owner: '石橋' },
-    { id: '5', name: '朝日工業社', accountClass: 'サブコン', group: '山﨑', status: '未取引', influence: 0.3, priority: 0.9, owner: '山﨑' },
-    { id: '6', name: 'グローバルスタッフ', accountClass: '設備工事', group: '清水', status: '既存顧客', influence: 0.8, priority: 2.4, owner: '清水' },
-    { id: '7', name: '高砂熱学工業', accountClass: 'サブコン', group: '川上', status: '休眠', influence: 0.4, priority: 1.2, owner: '川上' },
-    { id: '8', name: 'ハンナエンジニアリング', accountClass: '設備工事', group: '清水', status: '既存顧客', influence: 1.1, priority: 3.3, owner: '清水' },
-    { id: '9', name: '三機工業', accountClass: 'サブコン', group: '齊藤', status: '既存顧客', influence: 2.1, priority: 6.3, owner: '齊藤' },
-    { id: '10', name: '東洋熱工業', accountClass: 'サブコン', group: '川上', status: '商談中', influence: 0.9, priority: 2.7, owner: '川上' },
-    { id: '11', name: '須賀工業', accountClass: 'サブコン', group: '石橋', status: '接触中', influence: 0.5, priority: 1.5, owner: '石橋' },
-    { id: '12', name: '大気社', accountClass: 'サブコン', group: '山﨑', status: '未取引', influence: 0.2, priority: 0.6, owner: '山﨑' }
+    { id: '2', name: 'ダイダン', accountClass: 'サブコン', group: '齊藤', status: '既存顧客', influence: 1.8, priority: 5.4, owner: '齊藤', shippingState: '大阪府', shippingCity: '大阪市' },
+    { id: '3', name: '大成建設', accountClass: 'ゼネコン', group: '川上', status: '商談中', influence: 1.2, priority: 3.6, owner: '川上', shippingState: '東京都', shippingCity: '新宿区' },
+    { id: '4', name: '鹿島建設', accountClass: 'ゼネコン', group: '石橋', status: '接触中', influence: 0.6, priority: 1.8, owner: '石橋', shippingState: '東京都', shippingCity: '港区' },
+    { id: '5', name: '朝日工業社', accountClass: 'サブコン', group: '山﨑', status: '未取引', influence: 0.3, priority: 0.9, owner: '山﨑', shippingState: '大阪府', shippingCity: '堺市' },
+    { id: '6', name: 'グローバルスタッフ', accountClass: '設備工事', group: '清水', status: '既存顧客', influence: 0.8, priority: 2.4, owner: '清水', shippingState: '東京都', shippingCity: '中央区' },
+    { id: '7', name: '高砂熱学工業', accountClass: 'サブコン', group: '川上', status: '休眠', influence: 0.4, priority: 1.2, owner: '川上', shippingState: '東京都', shippingCity: '千代田区' },
+    { id: '8', name: 'ハンナエンジニアリング', accountClass: '設備工事', group: '清水', status: '既存顧客', influence: 1.1, priority: 3.3, owner: '清水', shippingState: '神奈川県', shippingCity: '横浜市' },
+    { id: '9', name: '三機工業', accountClass: 'サブコン', group: '齊藤', status: '既存顧客', influence: 2.1, priority: 6.3, owner: '齊藤', shippingState: '東京都', shippingCity: '中央区' },
+    { id: '10', name: '東洋熱工業', accountClass: 'サブコン', group: '川上', status: '商談中', influence: 0.9, priority: 2.7, owner: '川上', shippingState: '東京都', shippingCity: '品川区' },
+    { id: '11', name: '須賀工業', accountClass: 'サブコン', group: '石橋', status: '接触中', influence: 0.5, priority: 1.5, owner: '石橋', shippingState: '愛知県', shippingCity: '名古屋市' },
+    { id: '12', name: '大気社', accountClass: 'サブコン', group: '山﨑', status: '未取引', influence: 0.2, priority: 0.6, owner: '山﨑', shippingState: '東京都', shippingCity: '新宿区' }
   ];
   var edges = [
     { sourceId: '1', targetId: '2', relType: '発注', strength: '強', memo: '大型案件で協力', recordId: 'e1' },
@@ -202,7 +208,7 @@ function stubGraph() {
     { sourceId: '9', targetId: '3', relType: '発注', strength: '強', memo: '大型空調', recordId: 'e20' }
   ];
   var allStubNodes = {};
-  allStubNodes['1'] = { id: '1', name: '新菱冷熱工業', accountClass: 'サブコン', group: '清水', status: '既存顧客', influence: 2.4, priority: 8.16, owner: '清水' };
+  allStubNodes['1'] = { id: '1', name: '新菱冷熱工業', accountClass: 'サブコン', group: '清水', status: '既存顧客', influence: 2.4, priority: 8.16, owner: '清水', shippingState: '東京都', shippingCity: '新宿区' };
   nodes.forEach(function(n) { allStubNodes[n.id] = n; });
 
   var cid = arguments[0] || '1';
@@ -221,8 +227,8 @@ function stubGraph() {
 
 // ── Data Layer ──
 var EDGE_QUERY = "SELECT id, field1, field, field3, field4, field2 FROM CustomModule1 WHERE (field1 = '{id}' or field = '{id}') LIMIT 200";
-var ACCT_QUERY = "SELECT id, Account_Name, field, field6, field15, field16, field17, Owner FROM Accounts WHERE id in ({ids}) LIMIT 200";
-var ACCT_SINGLE = "SELECT id, Account_Name, field, field6, field15, field16, field17, Owner FROM Accounts WHERE id = '{id}' LIMIT 1";
+var ACCT_QUERY = "SELECT id, Account_Name, field, field6, field15, field16, field17, Owner, Shipping_State, Shipping_City FROM Accounts WHERE id in ({ids}) LIMIT 200";
+var ACCT_SINGLE = "SELECT id, Account_Name, field, field6, field15, field16, field17, Owner, Shipping_State, Shipping_City FROM Accounts WHERE id = '{id}' LIMIT 1";
 
 function fetchGraph(entityId) {
   var edgeQ = EDGE_QUERY.replace(/\{id\}/g, entityId);
@@ -279,7 +285,8 @@ function fetchSingleAccount(id) {
 }
 function parseAccount(id, a, fb) {
   return { id: id, name: a.Account_Name || fb || id, accountClass: a.field || '', group: a.field6 || '', status: a.field15 || '',
-    influence: parseFloat(a.field16) || 0, priority: parseFloat(a.field17) || 0, owner: (a.Owner && a.Owner.name) || '' };
+    influence: parseFloat(a.field16) || 0, priority: parseFloat(a.field17) || 0, owner: (a.Owner && a.Owner.name) || '',
+    shippingState: a.Shipping_State || '', shippingCity: a.Shipping_City || '' };
 }
 
 // ── Constants ──
@@ -299,9 +306,32 @@ var selType = null, selIdx = -1;
 var animId = null;
 
 // ── Filtering ──
+function buildDynamicFilters() {
+  var owners = {}, states = {};
+  Object.keys(allNodeMap).forEach(function(nid) {
+    var n = allNodeMap[nid];
+    if (n.owner) owners[n.owner] = true;
+    if (n.shippingState) states[n.shippingState] = true;
+  });
+  var fOwner = document.getElementById('fOwner');
+  var fState = document.getElementById('fState');
+  var curOwner = fOwner.value, curState = fState.value;
+  fOwner.innerHTML = '<option value="">全て</option>';
+  fState.innerHTML = '<option value="">全て</option>';
+  Object.keys(owners).sort().forEach(function(o) {
+    fOwner.innerHTML += '<option value="' + esc(o) + '">' + esc(o) + '</option>';
+  });
+  Object.keys(states).sort().forEach(function(s) {
+    fState.innerHTML += '<option value="' + esc(s) + '">' + esc(s) + '</option>';
+  });
+  fOwner.value = curOwner; fState.value = curState;
+}
+
 function applyFilters() {
   var fType = document.getElementById('fType').value;
   var fStr = document.getElementById('fStr').value;
+  var fOwner = document.getElementById('fOwner').value;
+  var fState = document.getElementById('fState').value;
   var fLimit = parseInt(document.getElementById('fLimit').value) || 30;
 
   // 1-hop only: edges that touch center
@@ -309,6 +339,14 @@ function applyFilters() {
     if (e.sourceId !== centerId && e.targetId !== centerId) return false;
     if (fType && e.relType !== fType) return false;
     if (fStr && e.strength !== fStr) return false;
+    // filter by neighbor's owner or state
+    if (fOwner || fState) {
+      var neighborId = (e.sourceId === centerId) ? e.targetId : e.sourceId;
+      var n = allNodeMap[neighborId];
+      if (!n) return false;
+      if (fOwner && n.owner !== fOwner) return false;
+      if (fState && n.shippingState !== fState) return false;
+    }
     return true;
   });
 
@@ -334,6 +372,7 @@ function applyFilters() {
   gNodes = [{ id: cn.id, label: cn.name, isCenter: true, color: CENTER_COLOR,
     accountClass: cn.accountClass, group: cn.group, status: cn.status,
     influence: cn.influence, priority: cn.priority, owner: cn.owner,
+    shippingState: cn.shippingState || '', shippingCity: cn.shippingCity || '',
     x: gW / 2, y: gH / 2, vx: 0, vy: 0, hw: 0, hh: 0 }];
   idMap[cn.id] = 0;
 
@@ -346,6 +385,7 @@ function applyFilters() {
       color: STATUS_COLOR[n.status] || '#94A3B8',
       accountClass: n.accountClass || '', group: n.group || '', status: n.status || '',
       influence: n.influence || 0, priority: n.priority || 0, owner: n.owner || '',
+      shippingState: n.shippingState || '', shippingCity: n.shippingCity || '',
       x: gW / 2 + rad * Math.cos(ang), y: gH / 2 + rad * Math.sin(ang),
       vx: 0, vy: 0, hw: 0, hh: 0 });
     idMap[n.id] = gNodes.length - 1;
@@ -521,13 +561,15 @@ function showNodePanel(node) {
   var f = '';
   if (node.status) f += '<div class="info-field"><span class="info-field-label">ステータス</span><span class="info-field-value">' + esc(node.status) + '</span></div>';
   if (node.owner) f += '<div class="info-field"><span class="info-field-label">担当</span><span class="info-field-value">' + esc(node.owner) + '</span></div>';
+  if (node.shippingState) f += '<div class="info-field"><span class="info-field-label">納品先</span><span class="info-field-value">' + esc([node.shippingState, node.shippingCity].filter(Boolean).join(' ')) + '</span></div>';
   if (f) h += '<div class="info-fields">' + f + '</div>';
   var ni = gNodes.indexOf(node), eh = '';
   gEdges.forEach(function(e) {
-    var other, dir; if (e.si === ni) { other = gNodes[e.ti]; dir = '→'; } else if (e.ti === ni) { other = gNodes[e.si]; dir = '←'; } else return;
-    eh += '<div class="info-edge-item"><span class="info-edge-dot" style="background:' + (REL_COLOR[e.relType] || '#ACACAC') + '"></span><span class="info-edge-name">' + dir + ' ' + esc(other.label) + '</span><div class="info-edge-meta">' + esc(e.relType) + ' / ' + esc(e.strength) + (e.memo ? ' - ' + esc(e.memo) : '') + '</div></div>';
+    var otherIdx, dir; if (e.si === ni) { otherIdx = e.ti; dir = '→'; } else if (e.ti === ni) { otherIdx = e.si; dir = '←'; } else return;
+    var other = gNodes[otherIdx];
+    eh += '<div class="info-edge-item clickable" onclick="selectNodeByIdx(' + otherIdx + ')"><span class="info-edge-dot" style="background:' + (REL_COLOR[e.relType] || '#ACACAC') + '"></span><span class="info-edge-name">' + dir + ' ' + esc(other.label) + '</span><div class="info-edge-meta">' + esc(e.relType) + ' / ' + esc(e.strength) + (e.memo ? ' - ' + esc(e.memo) : '') + '</div></div>';
   });
-  if (eh) h += '<div class="info-edges"><div class="info-edges-title">関係性</div>' + eh + '</div>';
+  if (eh) h += '<div class="info-edges"><div class="info-edges-title">関係性 (クリックで選択)</div>' + eh + '</div>';
   document.getElementById('panelContent').innerHTML = h;
 }
 function showEdgePanel(edge) {
@@ -539,11 +581,18 @@ function showEdgePanel(edge) {
   f += '<div class="info-field"><span class="info-field-label">強さ</span><span class="info-field-value">' + esc(edge.strength) + '</span></div>';
   if (edge.memo) f += '<div class="info-field"><span class="info-field-label">メモ</span><span class="info-field-value">' + esc(edge.memo) + '</span></div>';
   h += '<div class="info-fields">' + f + '</div>';
-  h += '<div class="info-edges"><div class="info-edges-title">接続ノード</div>';
-  [src, tgt].forEach(function(n) { h += '<div class="info-edge-item"><span class="info-edge-dot" style="background:' + n.color + '"></span><span class="info-edge-name">' + esc(n.label) + '</span><div class="info-edge-meta">' + esc([n.accountClass, n.status].filter(Boolean).join(' / ')) + (n.influence > 0 ? ' / 影響度 ' + n.influence.toFixed(1) : '') + '</div></div>'; });
+  h += '<div class="info-edges"><div class="info-edges-title">接続ノード (クリックで選択)</div>';
+  [edge.si, edge.ti].forEach(function(idx) { var n = gNodes[idx]; h += '<div class="info-edge-item clickable" onclick="selectNodeByIdx(' + idx + ')"><span class="info-edge-dot" style="background:' + n.color + '"></span><span class="info-edge-name">' + esc(n.label) + '</span><div class="info-edge-meta">' + esc([n.accountClass, n.status].filter(Boolean).join(' / ')) + (n.influence > 0 ? ' / 影響度 ' + n.influence.toFixed(1) : '') + '</div></div>'; });
   h += '</div>';
   document.getElementById('panelContent').innerHTML = h;
 }
+function selectNodeByIdx(idx) {
+  if (idx >= 0 && idx < gNodes.length) {
+    selType = 'node'; selIdx = idx;
+    showNodePanel(gNodes[idx]);
+  }
+}
+
 function showEmptyPanel() { document.getElementById('panelContent').innerHTML = '<div class="info-header"><div class="info-name">-</div><div class="info-class">ノードまたはエッジをクリック</div></div>'; }
 function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
 
@@ -562,11 +611,16 @@ function renderGraph(graph) {
   graph.nodes.forEach(function(n) { allNodeMap[n.id] = n; });
   allEdges = graph.edges;
 
+  if (!IS_STUB && ZOHO.CRM && ZOHO.CRM.UI) {
+    try { ZOHO.CRM.UI.Resize({ height: '600' }); } catch(e) {}
+  }
+
   msgEl.style.display = 'none';
   document.getElementById('legend').style.display = 'flex';
   document.getElementById('filterBar').style.display = 'flex';
 
   updateNav();
+  buildDynamicFilters();
   applyFilters();
 
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -623,9 +677,9 @@ function initCanvas() {
   cv.addEventListener('mouseup', onUp); cv.addEventListener('mouseleave', function() { onUp(); tipEl.classList.remove('on'); hoverIdx = -1; });
   cv.addEventListener('click', onClick);
   cv.addEventListener('touchstart', onTouchStart, { passive: false }); cv.addEventListener('touchmove', onTouchMove, { passive: false }); cv.addEventListener('touchend', onUp);
-  document.getElementById('fType').addEventListener('change', onFilterChange);
-  document.getElementById('fStr').addEventListener('change', onFilterChange);
-  document.getElementById('fLimit').addEventListener('change', onFilterChange);
+  ['fType','fStr','fOwner','fState','fLimit'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', onFilterChange);
+  });
 }
 
 // ── Boot ──

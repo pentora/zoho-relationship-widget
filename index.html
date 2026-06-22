@@ -247,16 +247,31 @@ function fetchGraph(entityId) {
     if (ids.length === 0) {
       return fetchSingleAccount(entityId).then(function(cn) { return { centerNode: cn, nodes: [], edges: edges }; });
     }
-    var inClause = ids.map(function(i) { return "'" + i + "'"; }).join(',');
-    return ZOHO.CRM.API.coql({ select_query: ACCT_QUERY.replace('{ids}', inClause) }).then(function(acctResp) {
-      var acctData = (acctResp && acctResp.data) || [];
-      var acctMap = {}; acctData.forEach(function(a) { acctMap[String(a.id)] = a; });
+    return fetchAccountsBatch(ids).then(function(acctMap) {
       var nodes = ids.map(function(nid) { return parseAccount(nid, acctMap[nid] || {}, neighborIds[nid]); });
       if (acctMap[entityId]) return { centerNode: parseAccount(entityId, acctMap[entityId], ''), nodes: nodes, edges: edges };
       return fetchSingleAccount(entityId).then(function(cn) { return { centerNode: cn, nodes: nodes, edges: edges }; });
     });
   });
 }
+function fetchAccountsBatch(ids) {
+  var BATCH = 100;
+  var chunks = [];
+  for (var i = 0; i < ids.length; i += BATCH) {
+    chunks.push(ids.slice(i, i + BATCH));
+  }
+  var acctMap = {};
+  return chunks.reduce(function(chain, chunk) {
+    return chain.then(function() {
+      var inClause = chunk.map(function(i) { return "'" + i + "'"; }).join(',');
+      return ZOHO.CRM.API.coql({ select_query: ACCT_QUERY.replace('{ids}', inClause) }).then(function(resp) {
+        var data = (resp && resp.data) || [];
+        data.forEach(function(a) { acctMap[String(a.id)] = a; });
+      });
+    });
+  }, Promise.resolve()).then(function() { return acctMap; });
+}
+
 function fetchSingleAccount(id) {
   return ZOHO.CRM.API.coql({ select_query: ACCT_SINGLE.replace('{id}', id) }).then(function(r) {
     return parseAccount(id, (r && r.data && r.data[0]) || {}, '');

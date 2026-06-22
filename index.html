@@ -570,9 +570,9 @@ function renderGraph(graph) {
   applyFilters();
 
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) { for (var i = 0; i < 200; i++) simulate(); }
   if (animId) cancelAnimationFrame(animId);
-  if (reduced) { for (var i = 0; i < 200; i++) simulate(); draw(); }
-  else { (function tick() { simulate(); draw(); animId = requestAnimationFrame(tick); })(); }
+  (function tick() { simulate(); draw(); animId = requestAnimationFrame(tick); })();
 }
 
 function onFilterChange() {

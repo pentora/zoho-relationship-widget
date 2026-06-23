@@ -434,7 +434,12 @@ function simulate() {
       fx += (dx2 / d2) * (d2 - sl) * sk; fy += (dy2 / d2) * (d2 - sl) * sk;
     }
     fx += (cx - ni.x) * grav; fy += (cy - ni.y) * grav;
-    if (dragging !== i) { ni.vx = (ni.vx + fx) * damp; ni.vy = (ni.vy + fy) * damp; ni.x += ni.vx; ni.y += ni.vy; }
+    if (dragging !== i) {
+      ni.vx = (ni.vx + fx) * damp; ni.vy = (ni.vy + fy) * damp;
+      if (Math.abs(ni.vx) < 0.1) ni.vx = 0;
+      if (Math.abs(ni.vy) < 0.1) ni.vy = 0;
+      ni.x += ni.vx; ni.y += ni.vy;
+    }
     ni.x = Math.max(70, Math.min(gW - 70, ni.x));
     ni.y = Math.max(24, Math.min(gH - 24, ni.y));
   }

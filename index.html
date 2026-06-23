@@ -421,7 +421,7 @@ function simulate() {
       // stronger repulsion + hard minimum distance, wider horizontal
       var f = rep / (d * d);
       if (d < minDist) f += (minDist - d) * 2;
-      var hBias = 1.6;
+      var hBias = 2.5;
       fx += (dx / d) * f * hBias; fy += (dy / d) * f;
     }
     for (var k = 0; k < gEdges.length; k++) {

@@ -418,10 +418,11 @@ function simulate() {
       if (i === j) continue;
       var dx = ni.x - gNodes[j].x, dy = ni.y - gNodes[j].y;
       var d = Math.sqrt(dx * dx + dy * dy) || 1;
-      // stronger repulsion + hard minimum distance, wider horizontal
+      // stronger repulsion + hard minimum, horizontal bias for pill nodes
       var f = rep / (d * d);
       if (d < minDist) f += (minDist - d) * 2;
-      var hBias = 10.0;
+      var absDx = Math.abs(dx), absDy = Math.abs(dy);
+      var hBias = absDx < 120 ? 5.0 : 2.0;
       fx += (dx / d) * f * hBias; fy += (dy / d) * f;
     }
     for (var k = 0; k < gEdges.length; k++) {

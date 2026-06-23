@@ -408,7 +408,7 @@ function applyFilters() {
 function simulate() {
   var nodeCount = gNodes.length;
   var rep = 5000 + nodeCount * 200;
-  var sk = 0.005, grav = 0.01, damp = 0.8;
+  var sk = 0.005, grav = 0.01, damp = 0.55;
   var sl = Math.min(gW, gH) * (nodeCount > 15 ? 0.18 : 0.24);
   var minDist = 80;
   var cx = gW / 2, cy = gH / 2;
